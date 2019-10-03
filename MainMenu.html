@@ -2,22 +2,25 @@
 <html lang="en-US">
     <head>
     
-    
+    <title>BBG_0.1</title>
+        
     </head>
     
-    <body onload="startGame()">
+    <body onload="startGame()" bgcolor="#4db8ff">
         
     <canvas width=1000 height=600 id="canvas">
         
-            <script>
+<script>
 function startGame() 
 {
     canvas : document.getElementById("canvas");
     var ctx = canvas.getContext("2d");
-    ctx.fillStyle = "blue";
+    ctx.fillStyle = "red";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
-        </script>
+</script>
+    
+
         
     </body>
 </html>
