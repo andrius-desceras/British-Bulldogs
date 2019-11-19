@@ -1,20 +1,13 @@
 <!DOCTYPE html>
 <html>
     <head></head>
-    <body onload="startGame()">
-        <h1>Test</h1>
+    <body onload="Initialise()">
+        <h1></h1>
         
-        <canvas id="canvas" width=1000 height=600 style="border:1px solid #000000;"></canvas>
-            
-        <script>
-            function startGame() 
-            {
-                var c = document.getElementById("canvas");
-                var MainCanvas = c.getContext("2d");
-                MainCanvas.fillStyle = "red";
-                MainCanvas.fillRect(0, 0, c.width, c.height);
-            }
-        </script>
-    </body>
+        <canvas id="canvas" width=1400 height=700"></canvas>
+        
+        <script type="text/javascript" src="socket.io"></script>
+        <script type="text/javascript" src="Javascript\Client.js"></script>
+    </body> 
 </html>
     
