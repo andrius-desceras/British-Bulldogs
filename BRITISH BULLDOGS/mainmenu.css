@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css?family=Bungee&display=swap');
+
+body {
+  background-image: url(Images/UJ.jpg);
+    background-repeat: no-repeat;
+    background-size:cover;
+  
+}
+
+#buttons {
+    position: absolute;
+    width: 300px;
+    height: 200px;
+    z-index: 15;
+    top: 50%;
+    left: 50%;
+    margin: -100px 0 0 -150px; 
+    }
+
+#play:active{
+    color: white;
+    top : 50px;
+    position: relative;
+}
+
+.btn {
+  border: none;
+  background-color: inherit;
+  padding: 14px 28px;
+  font-size: 30px;
+  text-align: center;
+  color: white;
+  font-family:'Bungee', cursive;
+  cursor: pointer;
+  display: inline;
+  position: absolute;
+  width: 300px;
+  height: 200px;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  margin: -100px 0 0 -150px;
+}
+
+
+
+.play:hover {
+    background-color: blue;
+    color: white;
+    transform:rotate(-2deg);
+}
+
+.howtoplay {
+    color: white;
+}
+
+.howtoplay:hover {
+    background-color: blue;
+    color: white;
+    transform:rotate(-2deg);
+}
+
+.highscores {
+    color: white;
+}
+
+.highscores:hover {
+    background-color: blue;
+    color: white;
+    transform:rotate(-2deg);
+}
