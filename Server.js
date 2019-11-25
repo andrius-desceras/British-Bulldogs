@@ -5,16 +5,23 @@ var Player = require(__dirname + '/Player.js');
 var GameConfig = require (__dirname + '/GameConfig.js');
 var Object = require(__dirname + '/Object.js');
 
+var cfg;
+
+cfg = JSON.parse(fs.readFileSync(__dirname + '/cfg.json', 'utf8', function(err)
+{
+    console.log('ERROR: Cannot read config file at ' + __dirname + '/cfg.json');
+    
+    cfg = new GameConfig();
+}));
+
 //Hostname and port for server
-var hostname = 'localhost';
-var port = 8080;
+var hostname = cfg.ServerAddress;
+var port = cfg.Port;
 
 //Create server with user join function
 var server = http.createServer(function(req, res)
 {
-    console.log('New user ' + req.connection.remoteAddress + ' attempting to connect');
-
-    console.log(path.join(__dirname, 'Public'));
+    //console.log('New user ' + req.connection.remoteAddress + ' attempting to connect');
     
     //Check if the page they are looking for exists
     switch(req.url)
@@ -23,8 +30,6 @@ var server = http.createServer(function(req, res)
             //If they are looking for the main page, send Index.html
             res.writeHead(200, 'Content-Type', 'text/html');
             fs.createReadStream(__dirname + '/Public/Index.html', 'utf8').pipe(res);
-
-            console.log(req.connection.remoteAddress + ' connected successfully');
             break;
         
         case "/Javascript/Client.js":
@@ -39,69 +44,149 @@ var server = http.createServer(function(req, res)
             fs.createReadStream(__dirname + '/node_modules/socket.io-client/dist/socket.io.js', 'utf8').pipe(res);
             break;
             
-        case "/Javascript/Style.css":
+        case "/CSS/Style.css":
             //If they are looking for the main page CSS, send Style.css in the CSS folder
             res.writeHead(200, 'Content-Type', 'text/css');
             fs.createReadStream(__dirname + '/Public/CSS/Style.css', 'utf8').pipe(res);
             break;
         
+        case "/":
+            //If they are looking for the main page, send Index.html
+            res.writeHead(200, 'Content-Type', 'text/html');
+            fs.createReadStream(__dirname + '/Public/Index.html', 'utf8').pipe(res);
+            break;
+
         default:
-            //If the page does not exist, send error 404 page
-            res.writeHead(404, 'Content-Type', 'text/html');
-            fs.createReadStream(__dirname + '/Public/404.html', 'utf8').pipe(res);
-        
-            console.log('Error 404: ' + req.connection.remoteAddress + ' attempted to connect to a page that does not exist: ' + req.url);
             break;
     }
 });
 
-
-var cfg = new GameConfig();
 var Objects = [];
 var Players = [];
-var EliminatedPlayers = [];
+var ActivePlayers = 0;
 var GameInProgress = false;
+var CurrentWaitTime;
 var PlayersAlive;
 var SafeZone;
 var RoundStartTime;
+var TickFunctionID;
+var LeaderboardData;
 
 var io = require('socket.io')(server, {});
 
 io.sockets.on('connection', function(socket)
 {
-    //console.log('New socket conncection');
-    
     //New player joining
     socket.on('NewPlayer', function(data)
     {
-        //Add new player to list of players
-        Players.push(new Player(Players.length, data.Name, cfg.SprintMultiplier, cfg.StaminaConsumptionRate));
-        Players[Players.length - 1].setSocketID(socket.id);
-        
-        console.log('New user ' + data.Name + ' connected with ID: ' + Players.length);
-        
-        //If the game is already in progress, set their start position and inform the player that the game has already started
-        if(GameInProgress)
+        if(ActivePlayers < cfg.MaxPlayers)
         {
-            Players[Players.length - 1].Position = [10, 6 + (Players.length * 18)];
-            
-            io.to(Players[Players.length - 1].SocketID).emit('NewGame',
+            if(ActivePlayers === 0)
             {
-                MyPlayerID: Players.length - 1
-            });
+                CurrentWaitTime = cfg.MaxWaitTime;
+
+                StartTimer = setInterval(function()
+                {
+                    CurrentWaitTime-= 1000;
+                }, 1000);
+
+                setTimeout(function()
+                {
+                    clearInterval(StartTimer);
+
+                    if(!GameInProgress)
+                        StartGame();
+                }, cfg.MaxWaitTime);
+            }
+
+            if(!GameInProgress)
+                socket.emit('SetStartTimer', {Time: CurrentWaitTime});
+
+            var PlayerPosition = -1;
+
+            for(var i = 0; i < Players.length; i++)
+            {
+                if(Players[i] !== undefined && Players[i].SocketID === socket.id)
+                {
+                    Players[i].Active = true;
+
+                    PlayerPosition = i;
+
+                    ActivePlayers++;
+                }          
+            }
+
+            if(PlayerPosition === -1)
+            {
+                console.log('New socket conncection with ' + socket.id);
+
+                //Add new player to list of players
+                Players.push(new Player(Players.length, data.Name, cfg.SprintMultiplier, cfg.StaminaConsumptionRate));
+                Players[Players.length - 1].SocketID = socket.id;
+
+                ActivePlayers++;
+
+                console.log('New user ' + data.Name + ' connected with ID: ' + Players.length);
+            }
+            else
+            {
+                console.log(Players[PlayerPosition].Name + ' is rejoining for another game');
+            }
+
+            //If the game is already in progress, set their start position and inform the player that the game has already started
+            if(GameInProgress)
+            {
+                io.to(Players[Players.length - 1].SocketID).emit('NewGame',
+                {
+                    MyPlayerID: -1
+                });
+
+                Players[Players.length - 1].Eliminated = true;
+                Players[Players.length - 1].Active = true;
+            }
+            else
+                //If the minimum number of players are met, start the game
+                if(ActivePlayers >= cfg.MinPlayers)
+                    StartGame();
         }
         else
-            //If the minimum number of players are met, start the game
-            if(Players.length >= cfg.MinPlayers)
-                StartGame();
+        {
+            socket.emit('Full');
+            socket.disconnect();
+        }
     });
     
     //Called when a user presses a key
     socket.on('KeyPress', function(data)
     {
+        var PlayerID;
+        
+        for(var i = 0; i < Players.length; i++)
+            if(Players[i].SocketID === socket.id)
+                PlayerID = i;
+        
         //Set the player's new velocity
-        if(Players[data.PlayerID] !== undefined && !Players[data.PlayerID].Eliminated)
-            Players[data.PlayerID].updateInputs(data.Key, data.isMoving);
+        if(Players[PlayerID] !== undefined && !Players[PlayerID].Eliminated)
+            Players[PlayerID].updateInputs(data.Key, data.isMoving);
+    });
+    
+    //Called when the user requests to view the leaderboard
+    socket.on('RequestLeaderboard', function()
+    {
+        var Leaderboard = [];
+        
+        //If the leaderboard is not loaded, load it
+        if(LeaderboardData === undefined)
+            LeaderboardData = JSON.parse(fs.readFileSync(__dirname + '/Leaderboard.json', 'utf8', function(err)
+            {
+                console.log('ERROR: Cannot read leaderboard file at ' + __dirname + '/Leaderboard.json');
+            }));
+        
+        //Select the top 10
+        Leaderboard = LeaderboardData.slice(0, 10);
+        
+        //Send the leaderboard data to the client
+        socket.emit('LeaderboardData', {LB: Leaderboard});
     });
 });
 
@@ -112,22 +197,35 @@ console.log('Now running on ' + hostname + ' at port ' + port);
 //Begin the game
 function StartGame()
 {
-    console.log('Starting new game with ' + Players.length + ' players');
+    console.log('Starting new game with ' + ActivePlayers + ' players');
     
     GameInProgress = true;
+    
+    var InactivePlayersPassed = 0;
     
     //Inform the connected players that the game is starting
     for(var i = 0; i < Players.length; i++)
     {
-        Players[i].Position = [10, 6 + (18 * i)];
-        
-        io.to(Players[i].SocketID).emit('NewGame', 
+        if(Players[i].Active)
         {
-            MyPlayerID: i
-        });
+            Players[i].Position = [10, 20 + (18 * (i - InactivePlayersPassed))];
+            
+            Players[i].Eliminated = false;
+            Players[i].Safe = false;
+            Players[i].Stamina = Players[i].MaxStamina;
+            Players[i].Inputs = [false, false, false, false, false];
+            Players[i].KillTouchDuration = 0;
+            
+            io.to(Players[i].SocketID).emit('NewGame', 
+            {
+                MyPlayerID: i
+            });
+        }
+        else
+            InactivePlayersPassed++;
     }
     
-    PlayersAlive = Players.length;
+    PlayersAlive = ActivePlayers;
     
     //The 4 outer walls of the map
     Objects.push(new Object(0, [-10, -10], [cfg.MapSize[0] + 20, 11], [0, 0], true));
@@ -152,6 +250,55 @@ function StartGame()
     SafeZone.Colour = 'green';
     
     Objects.push(SafeZone);
+    
+    //If There are PowerUps enabled, spawn a random number of them between PowerUpCount[0] and PowerUpCount[1]
+    if(cfg.PowerUpCount[1] > 0)
+    {
+        for(var i = 0; i < ((Math.random() * (cfg.PowerUpCount[1] - cfg.PowerUpCount[0])) + cfg.PowerUpCount[0]); i++)
+        {
+            //Set the PowerUp position so that it in a random place in the middle of the map
+            var NewObject = new Object(Objects.length, [(Math.random() * (cfg.PowerUpDropRange[1] - cfg.PowerUpDropRange[0]) + cfg.PowerUpDropRange[0]), (Math.random() * (cfg.MapSize[1] - 50)) + 25], cfg.PowerUpSize, [0, 0], false);
+            
+            //For adding new PowerUp effects, add 1 to the multiplier in the switch and add a new case for it's collision function
+            switch(Math.floor(Math.random() * 2))
+            {
+                //The PowerUp grants a temporary speed boost
+                case 0:
+                    NewObject.setCollisionFunction(function(Data)
+                    {
+                        //Add a new speed buff to the speed buff multipliers for the player
+                        Players[Data.ID].SpeedBuffMultipliers.push(
+                        {
+                            Multipler: cfg.PowerUpSprintMultiplier, 
+                            Duration: (cfg.TickRate * 2)
+                        });
+                        
+                        //Move it so that it is outside of the map
+                        this.Position = cfg.MapSize;
+                    });
+                    
+                    NewObject.BorderColour = 'green';
+                    
+                    break;
+                    
+                case 1:
+                    NewObject.setCollisionFunction(function(Data)
+                    {
+                        //Add a new speed buff to the speed buff multipliers for the player
+                        Players[Data.ID].KillTouchDuration = cfg.TickRate * 5;
+                        
+                        //Move it so that it is outside of the map
+                        this.Position = cfg.MapSize;
+                    });
+                    
+                    NewObject.BorderColour = 'green';
+                    
+                    break;
+            }
+            
+            Objects.push(NewObject);
+        }
+    }
     
     var CurrentPosition = cfg.MovingObjectZoneX[0];
     
@@ -182,44 +329,7 @@ function StartGame()
         //Add a random value to current position
         CurrentPosition += (cfg.MovingObjectSize[0] + Math.floor(Math.random() * (cfg.MovingObjectSpacing[1] - cfg.MovingObjectSpacing[0])) + cfg.MovingObjectSpacing[0]);
     }
-    
-    //If There are PowerUps enabled, spawn a random number of them between PowerUpCount[0] and PowerUpCount[1]
-    if(cfg.PowerUpCount[1] > 0)
-    {
-        for(var i = 0; i < ((Math.random() * (cfg.PowerUpCount[1] - cfg.PowerUpCount[0])) + cfg.PowerUpCount[0]); i++)
-        {
-            //Set the PowerUp position so that it in a random place in the middle of the map
-            var NewObject = new Object(Objects.length, [(Math.random() * (cfg.PowerUpDropRange[1] - cfg.PowerUpDropRange[0]) + cfg.PowerUpDropRange[0]), (Math.random() * (cfg.MapSize[1] - 50)) + 25], cfg.PowerUpSize, [0, 0], false);
-            
-            //For adding new PowerUp effects, add 1 to the multiplier in the switch and add a new case for it's collision function
-            switch(Math.random() * 0)
-            {
-                //The PowerUp grants a temporary speed boost
-                case 0:
-                    NewObject.setCollisionFunction(function(Data)
-                    {
-                        //Add a new speed buff to the speed buff multipliers for the player
-                        Players[Data.ID].SpeedBuffMultipliers.push(
-                        {
-                            Multipler: cfg.PowerUpSprintMultiplier, 
-                            Duration: (cfg.TickRate * 2)
-                        });
-                        
-                        //Move it so that it is outside of the map
-                        this.Position = cfg.MapSize;
-                    });
-                    
-                    NewObject.BorderColour = 'green';
-                    
-                    break;
-                   
-            }
-            
-            Objects.push(NewObject);
-        }
-        
-    }
-    
+
     //If There are Ghosts enabled, spawn a random number of them between GhostCount[0] and GhostCount[1]
     if(cfg.GhostCount[0] > 0)
     {
@@ -251,7 +361,7 @@ function StartGame()
                         this.Target = [(cfg.MapSize[0] * 0.2) + (cfg.MapSize[0] * Math.random() * 0.6), (cfg.MapSize[1] * 0.2) + (cfg.MapSize[1] * Math.random() * 0.6)];
                     }
                     
-                    if(Math.random() > 0.97)
+                    if(Math.random() > cfg.GhostTargetChance)
                     {
                         //Calculate the vision range boundaries
                         var Bounds = [this.Position, [this.Position[0] + cfg.GhostVisionRange, this.Position[1] + cfg.GhostVisionRange]];
@@ -336,7 +446,7 @@ function StartGame()
     }
     
     //Set the interval for updating all of the positions in the game
-    setInterval(function()
+    TickFunctionID = setInterval(function()
     { 
         data = [];
         
@@ -404,10 +514,12 @@ function StartGame()
                         v[0] = v[0] * 0.7;
                         v[1] = v[1] * 0.7;
                     }
-
+                    
+                    var SpeedBuff = Players[i].SpeedBuffMultiplier > cfg.SpeedMultiplierCap ? cfg.SpeedMultiplierCap : Players[i].SpeedBuffMultiplier;
+                    
                     //New potential coordinations if their are no collisions
-                    var newX = Players[i].Position[0] + (v[0] * cfg.GlobalSpeed * Players[i].SpeedBuffMultiplier);
-                    var newY = Players[i].Position[1] + (v[1] * cfg.GlobalSpeed * Players[i].SpeedBuffMultiplier);
+                    var newX = Players[i].Position[0] + (v[0] * cfg.GlobalSpeed * SpeedBuff);
+                    var newY = Players[i].Position[1] + (v[1] * cfg.GlobalSpeed * SpeedBuff);
                     
                     var CollisionData = CheckForCollisions([newX, newY], cfg.PlayerSize, cfg.PlayerCollision, true, true, i)
                     
@@ -416,12 +528,11 @@ function StartGame()
                         Players[i].Position = [newX, newY];
                     else
                     {
-                        //If the player is touching the safe zone barrier, move them to the safe zone
-                        //if(CollisionData.ObjectType === 2 && CollisionData.ID === SafeZone.ID && !Players[i].Safe)
-                            //SetPlayerSafe(i);
-                        
                         if(CollisionData.ObjectType === 2 && Objects[CollisionData.ID].CollisionFunction !== undefined)
                             Objects[CollisionData.ID].CollisionFunction({ID: Players[i].ID, ObjectType: 1});
+                        else
+                            if(CollisionData.ObjectType === 1 && Players[i].KillTouchDuration > 0)
+                                EliminatePlayer(CollisionData.ID);
                         
                         //If the player can only move along the x or y coordinate, then move it accordingly
                         if(CheckForCollisions([newX, Players[i].Position[1]], cfg.PlayerSize, cfg.PlayerCollision, true, true, i).ID === -1)
@@ -439,7 +550,8 @@ function StartGame()
                     Alive: true,
                     Position: [Math.round(Players[i].Position[0]), Math.round(Players[i].Position[1])],
                     ObjectTypeID: 1,
-                    ObjectID: Players[i].ID
+                    ObjectID: Players[i].ID,
+                    BorderColour: Players[i].KillTouchDuration > 0 ? 'red' : undefined
                 });
             }
             else
@@ -449,7 +561,7 @@ function StartGame()
                 });
             
             //Regenerate player stamina
-            if(Players[i].Stamina < Players[1].MaxStamina - cfg.StaminaRegenerationRate)
+            if(Players[i].Stamina < Players[i].MaxStamina - cfg.StaminaRegenerationRate)
                 Players[i].Stamina += cfg.StaminaRegenerationRate;
         }
         
@@ -459,7 +571,7 @@ function StartGame()
         
     }, Math.round(1000 / cfg.TickRate));
     
-    RoundStartTime = new Date().getMilliseconds();
+    RoundStartTime = new Date();
 }
 
 function CheckForCollisions(Position, Size, CheckPlayers, CheckObjects, IsPlayer, ID)
@@ -509,14 +621,17 @@ function EliminatePlayer(PlayerID)
 {
     Players[PlayerID].Eliminated = true;
                 
+    //Inform the player that they have been eliminated
     io.to(Players[PlayerID].SocketID).emit('Eliminated', {PlayersAlive: PlayersAlive});
                 
     PlayersAlive--;
     
+    //Reset the player's completion streak
+    Players[PlayerID].CompletionTimes = [];
+    
+    //If there are no more players in the game, end it
     if(PlayersAlive === 0)
-    {
         EndGame();
-    }
 }
 
 //Set a player as 'safe' when they have completed the map
@@ -526,27 +641,97 @@ function SetPlayerSafe(PlayerID)
     
     Players[PlayerID].Position[0]+= (cfg.PlayerSize[0] + 10);
     
+    //Inform the player that they are safe
     io.to(Players[PlayerID].SocketID).emit('Safe', {});
     
-    Players[PlayerID].CompletionTime = RoundStartTime - new Date().getMilliseconds();
+    //Record their completion time
+    Players[PlayerID].CompletionTimes.push((new Date() - RoundStartTime));
+
+    var TotalTime = Players[PlayerID].TotalTime();
+    
+    //If the player has completed the game enough consecutive times, insert them into the leaderboard
+    if(Players[PlayerID].CompletionTimes.length > LeaderboardData[LeaderboardData.length - 1].Rounds)
+    {
+        //Remove the old leaderboard entry
+        LeaderboardData = LeaderboardData.slice(0, LeaderboardData.length - 1);
+        
+        //Add the new player to the leaderboard
+        LeaderboardData.push({Name: Players[PlayerID].Name, Rounds: Players[PlayerID].CompletionTimes.length, Time: TotalTime});
+        
+        //Sort the leaderboard
+        LeaderboardData.sort(function(a, b)
+        {
+            return b.Rounds - a.Rounds;
+        });
+        
+        //Write the new leaderboard to the file
+        fs.writeFile(__dirname + '/Leaderboard.json', JSON.stringify(LeaderboardData), function(err)
+        {
+            console.log('Added new high score to leaderboard successfully');
+        });
+    }
+    
+    PlayersAlive--;
+    
+    //If there are no more players in the game, end it
+    if(PlayersAlive === 0)
+        EndGame();
 }
 
+//End the game
 function EndGame()
 {
     var Winner;
     
     //Find the player with the fastest completion time, if there are any
     for(var i = 0; i < Players.length; i++)
-        if(Player[i] !== undefined && Player[i].CompletionTime !== undefined && (Winner === undefined || Winner.CompletionTime < Players[i].CompletionTime))
-            Winner = Players[i].CompletionTime;
-    
+        if(Players[i] !== undefined && Players[i].CompletionTimes.length > 0 && (Winner === undefined || Winner.TotalTime() < Players[i].TotalTime()))
+            Winner = Players[i];
+
     var WinnerData = undefined;
     
     //Package their data
     if(Winner !== undefined)
-        WinnerData = {Username: Winner.Username, CompletionTime: Winner.CompletionTime};
-        
+        WinnerData = {Username: Winner.Name, CompletionTime: Winner.TotalTime()};
+
     //Send the end game data to all of the players in the game
     for(var i = 0; i < Players.length; i++)
         io.to(Players[i].SocketID).emit('EndGame', WinnerData);
+
+    console.log('Round complete, preparing to restart');
+    
+    //After 4 seconds, end the game
+    setTimeout(function ()
+    {
+        Objects = [];
+
+        clearInterval(TickFunctionID);
+        
+        var NewPlayers = [];
+        
+        //Any active players will have the ability to have their progress transferred to the next round
+        for(var i = 0; i < Players.length; i++)
+            if(Players[i].Active)
+            {
+                NewPlayers.push(Players[i]);
+                NewPlayers[NewPlayers.length - 1].ID = NewPlayers.length - 1;
+                NewPlayers[NewPlayers.length - 1].Active = false;
+                NewPlayers[NewPlayers.length - 1].Eliminated = true;
+            }
+            else
+            {
+                if(io.sockets.connected[Players[i].SocketID] !== undefined)
+                {
+                    io.sockets.connected[Players[i].SocketID].disconnect();
+
+                    console.log('Forcibly disconnected ' + Players[i].Name + ' for not playing');
+                }
+            }
+        
+        Players = NewPlayers;
+        
+        GameInProgress = false;
+        
+        ActivePlayers = 0;
+    }, 4000);
 }
