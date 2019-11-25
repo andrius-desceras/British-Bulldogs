@@ -1,29 +1,21 @@
 @import url('https://fonts.googleapis.com/css?family=Bungee&display=swap');
 
 body {
-  background-image: url(Images/UJ.jpg);
+    background-image: url(Images/UJ.jpg);
     background-repeat: no-repeat;
-    background-size:cover;
-  
+    background-size:1400px 700px;
 }
 
-#buttons {
-    position: absolute;
-    width: 300px;
-    height: 200px;
-    z-index: 15;
-    top: 50%;
-    left: 50%;
-    margin: -100px 0 0 -150px; 
-    }
+div.image {
+   content:url(Images/bulldog1.png);
+   width: 300px;
+   height: 300px;
+    display: inline-flex;
+    margin: auto 540px
 
-#play:active{
-    color: white;
-    top : 50px;
-    position: relative;
 }
 
-.btn {
+.btn1 {
   border: none;
   background-color: inherit;
   padding: 14px 28px;
@@ -35,14 +27,51 @@ body {
   display: inline;
   position: absolute;
   width: 300px;
-  height: 200px;
+  height: 100px;
   z-index: 15;
   top: 50%;
   left: 50%;
-  margin: -100px 0 0 -150px;
+  margin:-365px -725px;
+    
 }
 
+.btn2 {
+  border: none;
+  background-color: inherit;
+  padding: 14px 28px;
+  font-size: 30px;
+  text-align: center;
+  color: white;
+  font-family:'Bungee', cursive;
+  cursor: pointer;
+  display: inline;
+  position: absolute;
+  width: 300px;
+  height: 100px;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  margin: -365px -400px;
+}
 
+.btn3 {
+  border: none;
+  background-color: inherit;
+  padding: 14px 28px;
+  font-size: 30px;
+  text-align: center;
+  color: white;
+  font-family:'Bungee', cursive;
+  cursor: pointer;
+  display: inline;
+  position: absolute;
+  width: 300px;
+  height: 100px;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  margin: -365px -1050px;
+}
 
 .play:hover {
     background-color: blue;
