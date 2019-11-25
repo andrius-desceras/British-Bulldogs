@@ -13,7 +13,7 @@ YOU WILL NEED NODEJS TO RUN THE SERVER
 --------------------------------------
 Instructions for server setup:
 
-1. Clone repositry to where you have access to.
+1. Clone repository to where you have access to.
 
 2. Locate GameConfig.js and change 'host' and 'port' to the desired values.
 
