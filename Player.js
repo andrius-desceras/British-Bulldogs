@@ -11,21 +11,15 @@ class Player
         this.StaminaConsumptionRate = StaminaConsumptionRate;
         this.SprintMultiplier = SprintMultiplier;
         this.SpeedBuffMultipliers = [{Multipler: 1, Duration: -1}];
+        this.KillTouchDuration = 0;
+        
+        this.CompletionTimes = [];
         
         this.Inputs = [false, false, false, false, false];
         this.Targeted = false;
         this.Safe = false;
         this.Eliminated = false;
-    }
-    
-    setSocketID(SocketID_)
-    {
-        this.SocketID = SocketID_;
-    }
-    
-    setPosition(Position_)
-    {
-        this.Position = Position_;
+        this.Active = true;
     }
     
     getVelocity()
@@ -60,6 +54,7 @@ class Player
         
         var s = 1;
         
+        //Calculate the total speed multiplier and process any decaying movement buffs
         for(var i = 0; i < this.SpeedBuffMultipliers.length; i++)
         {
             s*= this.SpeedBuffMultipliers[i].Multipler;
@@ -71,6 +66,8 @@ class Player
                 this.SpeedBuffMultipliers.splice(i, 1);
         }
         
+        this.KillTouchDuration--;
+        
         this.SpeedBuffMultiplier = s;
         
         return v;
@@ -81,6 +78,12 @@ class Player
     {
         if(InputID !== 5 || this.Stamina > 20 || !isMoving)
             this.Inputs[InputID - 1] = isMoving;
+    }
+    
+    //Gets the total time the player has been alive in consecutive rounds
+    TotalTime()
+    {
+        return this.CompletionTimes.reduce((x, y) => x + y);
     }
 }
 

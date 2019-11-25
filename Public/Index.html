@@ -1,13 +1,29 @@
 <!DOCTYPE html>
 <html>
-    <head></head>
+    <head>
+        <script type="text/javascript" src="socket.io"></script>
+    </head>
     <body onload="Initialise()">
-        <h1></h1>
+        <h1 id='heading'>British Bulldogs</h1>
+        
+
+        <form id="form">
+        Username: <input type="text" name="Username" id="textInput"><br>
+        </form>
+        
+        <button onclick="Join()" id="join" class="button">Join Game</button>
+        
         
         <canvas id="canvas" width=1400 height=700"></canvas>
         
-        <script type="text/javascript" src="socket.io"></script>
-        <script type="text/javascript" src="Javascript\Client.js"></script>
+        <button onclick="LoadLeaderboard()" id="leaderboard" class="button">View Leaderboard</button>
+                                                  
+        <div id="table"> </div>
+                       
+        <script type="text/javascript" src="/Javascript/Client.js"></script>
+        <link rel="stylesheet" type="text/css" href="/CSS/Style.css">
     </body> 
 </html>
     
+
+        
