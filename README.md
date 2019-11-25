@@ -1,5 +1,10 @@
-# British-Bulldogs                 
+# British-Bulldogs    
+
+An interesting mash up inspired by British Bulldogs, Frogger and The Impossible Game.
+
 Created by Andrius Desceras, Daniel Ryan and Cale Clark.
+
+
                   
 British Bulldogs is a game created for Web Programming (F28WP) course, ran by Dr Benjamin Kenwright.
 It involves up to 50 players starting on the left side of the screen with a goal of getting to the right side of the screen. In their way will lies obstactles that they will have to dodge to achivest the highest score.
