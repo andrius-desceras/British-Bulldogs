@@ -15,20 +15,23 @@ Instructions for server setup:
 
 1. Clone repositry to where you have access to.
 
-2. Open command prompt and locate the main folder.
+2. Locate GameConfig.js and change 'host' and 'port' to the desired values.
 
-3. Once at ././British-Bulldogs, type 
+3. Open command prompt and locate the main folder.
+
+4. Once at ././British-Bulldogs, type 
 
          node server.js
          
    into the command prompt.
-4. If no errors occur, go to
+   
+5. If no errors occur, go to
 
-          localhost:8080
+          hostname:port
           
    in the browswer of your choice.
    
-5. Enjoy the game!
+6. Enjoy the game!
 
 
 Tutorial for playing:
